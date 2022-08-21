@@ -1,5 +1,5 @@
 ARG java_image_tag=8-jre-slim
-FROM python:3.7-slim-buster
+FROM ubuntu:18.04
 
 # Build options
 ARG hive_version=2.3.7
@@ -12,10 +12,25 @@ ENV HADOOP_VERSION=${hadoop_version}
 
 WORKDIR /
 
-# JDK repo
-RUN echo "deb http://ftp.us.debian.org/debian sid main" >> /etc/apt/sources.list \
-  &&  apt-get update \
-  &&  mkdir -p /usr/share/man/man1
+RUN apt update
+RUN apt upgrade -y
+
+# Install python 3.7
+RUN apt install software-properties-common -y
+RUN add-apt-repository ppa:deadsnakes/ppa
+RUN apt install python3.7 -y
+
+# Make python 3.7 the default
+RUN echo "alias python=python3.7" >> ~/.bashrc
+RUN export PATH=${PATH}:/usr/bin/python3.7
+RUN /bin/bash -c "source ~/.bashrc"
+# Install pip
+RUN apt install python3-pip -y
+# Add 3.7 to the available alternatives
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.7 1
+# Set python3.7 as the default python
+RUN update-alternatives --set python /usr/bin/python3.7
+RUN python -m pip install --upgrade pip
 
 # install deps
 RUN apt-get install -y git curl wget openjdk-8-jdk patch && rm -rf /var/cache/apt/*
@@ -39,8 +54,8 @@ RUN mkdir hive && tar xzf hive.tar.gz --strip-components=1 -C hive
 WORKDIR /opt/hive
 ADD https://issues.apache.org/jira/secure/attachment/12958418/HIVE-12679.branch-2.3.patch hive.patch
 #### Build patched hive
-RUN patch -p0 <hive.patch &&\
-  mvn  clean install -DskipTests
+RUN patch -p0 < hive.patch && \
+  mvn clean install -DskipTests
 
 ## Glue support
 WORKDIR /opt
